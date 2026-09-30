@@ -89,12 +89,15 @@ def check_mailbox_smtp(email, domain):
     return "Risky", "Unable to verify due to strict server firewall"
 
 def validate_single_email(email):
-    email = email.strip().lower()
+    email = str(email).strip().lower()
     
     if not is_valid_format(email):
         return "Invalid", "Invalid email format", ""
     
-    local_part, domain = email.split('@')
+    try:
+        local_part, domain = email.split('@')
+    except ValueError:
+        return "Invalid", "Invalid email format", ""
     
     suggestion = ""
     if domain in COMMON_DOMAIN_TYPOS:
@@ -187,21 +190,21 @@ with tab2:
                 progress_bar = st.progress(0)
                 status_text = st.empty()
                 
-                total_rows = len(df_original)
+                rows_data = df_original.to_dict(orient="records")
+                total_rows = len(rows_data)
                 
-                def process_row(index_row):
-                    index, row = index_row
-                    email = str(row[selected_col])
-                    status, reason, suggestion = validate_single_email(email)
+                def process_row(row_dict):
+                    email_val = row_dict.get(selected_col, "")
+                    status, reason, suggestion = validate_single_email(email_val)
                     
-                    row_dict = row.to_dict()
-                    row_dict['Validation_Status'] = status
-                    row_dict['Error_Reason'] = reason
-                    row_dict['Suggested_Correction'] = suggestion
-                    return row_dict
+                    new_row = row_dict.copy()
+                    new_row['Validation_Status'] = status
+                    new_row['Error_Reason'] = reason
+                    new_row['Suggested_Correction'] = suggestion
+                    return new_row
 
                 with ThreadPoolExecutor(max_workers=10) as executor:
-                    futures = {executor.submit(process_row, item): item for item in enumerate(df_original.iterrows())}
+                    futures = {executor.submit(process_row, row): row for row in rows_data}
                     
                     completed = 0
                     for future in concurrent.futures.as_completed(futures):
