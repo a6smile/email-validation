@@ -114,7 +114,7 @@ def validate_single_email(email):
 
 # --- GUI INTERFACE ---
 st.title("Email Verification Tool")
-st.write("This tool verifies the validity of an email address before importing to Brevo to reduce bounce risks.")
+st.write("This tool verifies the validity of email addresses before importing them to your email marketing platform to reduce bounce risks.")
 st.info("The result may not be accurate. However, it has 90% accuracy.")
 
 tab1, tab2 = st.tabs(["Single Email / Multiple by Line", "Bulk File Processing (CSV, XLS, XLSX, TXT)"])
