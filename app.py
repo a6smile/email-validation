@@ -158,35 +158,36 @@ with tab2:
 
     if uploaded_file is not None:
         file_extension = uploaded_file.name.split('.')[-1].lower()
-        df = None
+        emails_list = []
+        df_original = None
         
         try:
             if file_extension == 'csv':
-                df = pd.read_csv(uploaded_file)
+                df_original = pd.read_csv(uploaded_file)
             elif file_extension in ['xls', 'xlsx']:
-                df = pd.read_excel(uploaded_file)
+                df_original = pd.read_excel(uploaded_file)
             elif file_extension == 'txt':
                 stringio = io.StringIO(uploaded_file.getvalue().decode("utf-8"))
-                lines = [line.strip() for line in stringio if line.strip()]
-                df = pd.DataFrame(lines, columns=["Email"])
+                emails_list = [line.strip() for line in stringio if line.strip()]
         except Exception as e:
             st.error(f"Error reading file: {e}")
             
-        if df is not None and not df.empty:
+        # Jika file CSV/Excel
+        if df_original is not None and not df_original.empty:
             st.write("Data Preview (First 5 Rows):")
-            st.dataframe(df.head())
+            st.dataframe(df_original.head())
             
-            email_columns = [col for col in df.columns if 'email' in str(col).lower()]
-            default_col = email_columns[0] if email_columns else df.columns[0]
+            email_columns = [col for col in df_original.columns if 'email' in str(col).lower()]
+            default_col = email_columns[0] if email_columns else df_original.columns[0]
             
-            selected_col = st.selectbox("Select the column containing email addresses:", df.columns, index=df.columns.get_loc(default_col))
+            selected_col = st.selectbox("Select the column containing email addresses:", df_original.columns, index=df_original.columns.get_loc(default_col))
             
             if st.button("Start Verification Process"):
                 results = []
                 progress_bar = st.progress(0)
                 status_text = st.empty()
                 
-                total_rows = len(df)
+                total_rows = len(df_original)
                 
                 def process_row(index_row):
                     index, row = index_row
@@ -200,7 +201,7 @@ with tab2:
                     return row_dict
 
                 with ThreadPoolExecutor(max_workers=10) as executor:
-                    futures = {executor.submit(process_row, item): item for item in enumerate(df.iterrows())}
+                    futures = {executor.submit(process_row, item): item for item in enumerate(df_original.iterrows())}
                     
                     completed = 0
                     for future in concurrent.futures.as_completed(futures):
@@ -210,7 +211,6 @@ with tab2:
                         status_text.text(f"Processing {completed} of {total_rows} emails...")
                         
                 st.success("Verification Completed!")
-                
                 df_result = pd.DataFrame(results)
                 
                 df_valid = df_result[df_result['Validation_Status'] == 'Valid']
@@ -245,3 +245,36 @@ with tab2:
                             file_name="rejected_emails.csv",
                             mime="text/csv"
                         )
+
+        # Jika file TXT
+        elif emails_list:
+            st.write(f"Data Preview ({len(emails_list)} emails found in TXT):")
+            st.write(emails_list[:5])
+            
+            if st.button("Start Verification Process"):
+                results = []
+                progress_bar = st.progress(0)
+                status_text = st.empty()
+                
+                total = len(emails_list)
+                for i, email in enumerate(emails_list):
+                    status, reason, suggestion = validate_single_email(email)
+                    results.append({
+                        "Email": email,
+                        "Validation_Status": status,
+                        "Error_Reason": reason,
+                        "Suggested_Correction": suggestion
+                    })
+                    progress_bar.progress((i + 1) / total)
+                    status_text.text(f"Processing {i + 1} of {total} emails...")
+                    
+                st.success("Verification Completed!")
+                df_result = pd.DataFrame(results)
+                st.dataframe(df_result, use_container_width=True)
+                
+                st.download_button(
+                    label="📥 Download Verification Result (CSV)",
+                    data=df_result.to_csv(index=False).encode('utf-8'),
+                    file_name="txt_verification_results.csv",
+                    mime="text/csv"
+                )
