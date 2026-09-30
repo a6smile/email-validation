@@ -62,8 +62,8 @@ def check_mailbox_smtp(email, domain):
     if not mx_host:
         return "Invalid", "Domain has no MX record"
     
-    if check_catch_all(mx_host, domain):
-        return "Risky", "Catch-All Server (High Bounce Risk)"
+    # Cek apakah domain berjenis catch-all
+    is_catch_all = check_catch_all(mx_host, domain)
 
     for attempt in range(2):
         try:
@@ -77,16 +77,20 @@ def check_mailbox_smtp(email, domain):
             if code == 250:
                 return "Valid", "Valid"
             elif code in [550, 551, 552, 553, 554]:
-                return "Risky", f"Server protected/strict security (Code: {code})"
+                # Jika server menolak karena firewall ketat tapi domainnya catch-all atau bukan
+                if is_catch_all:
+                    return "Risky (Catch-All)", f"Catch-All Server (Code: {code})"
+                else:
+                    return "Risky (Likely Valid)", f"Strict Corporate Firewall (Code: {code})"
             else:
-                return "Risky", f"Server responded with code {code}"
+                return "Risky (Catch-All)" if is_catch_all else "Risky (Likely Valid)", f"Server response code {code}"
         except (socket.timeout, smtplib.SMTPConnectError):
             if attempt == 1:
-                return "Risky", "Server timeout (Strict Firewall)"
+                return "Risky (Likely Valid)", "Server timeout (Active Domain with Strict Firewall)"
         except Exception:
             break
             
-    return "Risky", "Unable to verify due to strict server firewall"
+    return "Risky (Likely Valid)", "Unable to verify due to strict server firewall"
 
 def validate_single_email(email):
     email = str(email).strip().lower()
