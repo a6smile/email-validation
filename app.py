@@ -261,6 +261,7 @@ with tab2:
                             mime="text/csv"
                         )
 
+        # Jika file TXT
         elif emails_list:
             st.write(f"Data Preview ({len(emails_list)} emails found in TXT):")
             st.write(emails_list[:5])
@@ -271,24 +272,71 @@ with tab2:
                 status_text = st.empty()
                 
                 total = len(emails_list)
-                for i, email in enumerate(emails_list):
+                
+                # Fungsi proses per email untuk TXT
+                def process_txt_email(email):
                     status, reason, suggestion = validate_single_email(email)
-                    results.append({
+                    return {
                         "Email": email,
                         "Validation_Status": status,
                         "Error_Reason": reason,
                         "Suggested_Correction": suggestion
-                    })
-                    progress_bar.progress((i + 1) / total)
-                    status_text.text(f"Processing {i + 1} of {total} emails...")
+                    }
+
+                # Gunakan ThreadPoolExecutor agar berjalan paralel (cepat)
+                with ThreadPoolExecutor(max_workers=10) as executor:
+                    futures = {executor.submit(process_txt_email, email): email for email in emails_list}
+                    
+                    completed = 0
+                    for future in concurrent.futures.as_completed(futures):
+                        results.append(future.result())
+                        completed += 1
+                        progress_bar.progress(completed / total)
+                        status_text.text(f"Processing {completed} of {total} emails...")
                     
                 st.success("Verification Completed!")
                 df_result = pd.DataFrame(results)
-                st.dataframe(df_result, use_container_width=True)
                 
-                st.download_button(
-                    label="📥 Download Verification Result (CSV)",
-                    data=df_result.to_csv(index=False).encode('utf-8'),
-                    file_name="txt_verification_results.csv",
-                    mime="text/csv"
-                )
+                # Filter dibagi menjadi 4 kategori seperti file CSV
+                df_valid = df_result[df_result['Validation_Status'] == 'Valid']
+                df_risky_likely = df_result[df_result['Validation_Status'] == 'Risky (Likely Valid)']
+                df_risky_catchall = df_result[df_result['Validation_Status'] == 'Risky (Catch-All)']
+                df_invalid = df_result[df_result['Validation_Status'] == 'Invalid']
+                
+                col1, col2, col3, col4 = st.columns(4)
+                with col1:
+                    st.metric("Valid", len(df_valid))
+                    if not df_valid.empty:
+                        st.download_button(
+                            label="📥 Download Valid",
+                            data=df_valid.to_csv(index=False).encode('utf-8'),
+                            file_name="txt_valid.csv",
+                            mime="text/csv"
+                        )
+                with col2:
+                    st.metric("Risky (Likely)", len(df_risky_likely))
+                    if not df_risky_likely.empty:
+                        st.download_button(
+                            label="📥 Download Risky-Likely",
+                            data=df_risky_likely.to_csv(index=False).encode('utf-8'),
+                            file_name="txt_risky_likely.csv",
+                            mime="text/csv"
+                        )
+                with col3:
+                    st.metric("Risky (Catch-All)", len(df_risky_catchall))
+                    if not df_risky_catchall.empty:
+                        st.download_button(
+                            label="📥 Download Catch-All",
+                            data=df_risky_catchall.to_csv(index=False).encode('utf-8'),
+                            file_name="txt_catchall.csv",
+                            mime="text/csv"
+                        )
+                with col4:
+                    st.metric("Invalid", len(df_invalid))
+                    if not df_invalid.empty:
+                        st.download_button(
+                            label="📥 Download Invalid",
+                            data=df_invalid.to_csv(index=False).encode('utf-8'),
+                            file_name="txt_invalid.csv",
+                            mime="text/csv"
+                        )
