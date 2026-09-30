@@ -16,7 +16,7 @@ Clone the repository:
 git clone https://github.com/a6smile/email_validation.git
 
 Change the directory to the cloned repository:
-cd email_validation_tool
+cd email_validation
 
 Install the required dependencies:
 pip install -r requirements.txt
@@ -24,7 +24,7 @@ pip install -r requirements.txt
 
 To launch the Email Validation Tool, run the following command:
 ```
-streamlit run main.py
+streamlit run app.py
 ```
 
 The tool will be accessible at http://localhost:8501 in your web browser.
