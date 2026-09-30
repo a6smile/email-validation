@@ -4,7 +4,7 @@ import re
 import dns.resolver
 import socket
 import smtplib
-from concurrent.futures import ThreadPoolExecutor, asChildThread if False else None
+from concurrent.futures import ThreadPoolExecutor
 import concurrent.futures
 
 # Page Configuration
@@ -147,7 +147,7 @@ if uploaded_file is not None:
             row_dict['Suggested_Correction'] = suggestion
             return row_dict
 
-        # Eksekusi paralel menggunakan ThreadPoolExecutor agar jauh lebih cepat
+        # Eksekusi paralel menggunakan ThreadPoolExecutor
         with ThreadPoolExecutor(max_workers=10) as executor:
             futures = {executor.submit(process_row, item): item for item in enumerate(df.iterrows())}
             
