@@ -62,7 +62,6 @@ def check_mailbox_smtp(email, domain):
     if not mx_host:
         return "Invalid", "Domain has no MX record"
     
-    # Cek apakah domain berjenis catch-all
     is_catch_all = check_catch_all(mx_host, domain)
 
     for attempt in range(2):
@@ -77,13 +76,12 @@ def check_mailbox_smtp(email, domain):
             if code == 250:
                 return "Valid", "Valid"
             elif code in [550, 551, 552, 553, 554]:
-                # Jika server menolak karena firewall ketat tapi domainnya catch-all atau bukan
                 if is_catch_all:
                     return "Risky (Catch-All)", f"Catch-All Server (Code: {code})"
                 else:
                     return "Risky (Likely Valid)", f"Strict Corporate Firewall (Code: {code})"
             else:
-                return "Risky (Catch-All)" if is_catch_all else "Risky (Likely Valid)", f"Server response code {code}"
+                return ("Risky (Catch-All)" if is_catch_all else "Risky (Likely Valid)"), f"Server response code {code}"
         except (socket.timeout, smtplib.SMTPConnectError):
             if attempt == 1:
                 return "Risky (Likely Valid)", "Server timeout (Active Domain with Strict Firewall)"
@@ -179,7 +177,6 @@ with tab2:
         except Exception as e:
             st.error(f"Error reading file: {e}")
             
-        # Jika file CSV/Excel
         if df_original is not None and not df_original.empty:
             st.write("Data Preview (First 5 Rows):")
             st.dataframe(df_original.head())
@@ -220,40 +217,50 @@ with tab2:
                 st.success("Verification Completed!")
                 df_result = pd.DataFrame(results)
                 
+                # Filter dibagi menjadi 4 kategori agar totalnya pas 100%
                 df_valid = df_result[df_result['Validation_Status'] == 'Valid']
-                df_risky = df_result[df_result['Validation_Status'] == 'Risky']
+                df_risky_likely = df_result[df_result['Validation_Status'] == 'Risky (Likely Valid)']
+                df_risky_catchall = df_result[df_result['Validation_Status'] == 'Risky (Catch-All)']
                 df_invalid = df_result[df_result['Validation_Status'] == 'Invalid']
                 
-                col1, col2, col3 = st.columns(3)
+                col1, col2, col3, col4 = st.columns(4)
                 with col1:
-                    st.metric("Valid Emails", len(df_valid))
+                    st.metric("Valid", len(df_valid))
                     if not df_valid.empty:
                         st.download_button(
-                            label="📥 Download Valid File (CSV)",
+                            label="📥 Download Valid",
                             data=df_valid.to_csv(index=False).encode('utf-8'),
-                            file_name="brevo_ready_valid.csv",
+                            file_name="brevo_valid.csv",
                             mime="text/csv"
                         )
                 with col2:
-                    st.metric("Risky / Catch-All", len(df_risky))
-                    if not df_risky.empty:
+                    st.metric("Risky (Likely)", len(df_risky_likely))
+                    if not df_risky_likely.empty:
                         st.download_button(
-                            label="📥 Download Risky File (CSV)",
-                            data=df_risky.to_csv(index=False).encode('utf-8'),
-                            file_name="brevo_risky.csv",
+                            label="📥 Download Risky-Likely",
+                            data=df_risky_likely.to_csv(index=False).encode('utf-8'),
+                            file_name="brevo_risky_likely.csv",
                             mime="text/csv"
                         )
                 with col3:
-                    st.metric("Invalid Emails", len(df_invalid))
+                    st.metric("Risky (Catch-All)", len(df_risky_catchall))
+                    if not df_risky_catchall.empty:
+                        st.download_button(
+                            label="📥 Download Catch-All",
+                            data=df_risky_catchall.to_csv(index=False).encode('utf-8'),
+                            file_name="brevo_catchall.csv",
+                            mime="text/csv"
+                        )
+                with col4:
+                    st.metric("Invalid", len(df_invalid))
                     if not df_invalid.empty:
                         st.download_button(
-                            label="📥 Download Invalid File (CSV)",
+                            label="📥 Download Invalid",
                             data=df_invalid.to_csv(index=False).encode('utf-8'),
-                            file_name="rejected_emails.csv",
+                            file_name="brevo_invalid.csv",
                             mime="text/csv"
                         )
 
-        # Jika file TXT
         elif emails_list:
             st.write(f"Data Preview ({len(emails_list)} emails found in TXT):")
             st.write(emails_list[:5])
